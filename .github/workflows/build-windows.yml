@@ -1,12 +1,8 @@
-name: Build Windows EXE
+name: Build Clairvue (Windows EXE)
 
-# Compile l'application en .exe sur une machine Windows, puis publie le
-# fichier en « artifact » téléchargeable.
-# Pour obtenir un lien de téléchargement PERMANENT, une Release GitHub est
-# créée (avec l'exe joint) dans deux cas :
-#   - push d'un tag « v* » ;
-#   - lancement manuel (workflow_dispatch) en indiquant un tag de release.
-# Dans ce dernier cas, c'est le runner GitHub qui crée le tag et la Release.
+# Compile Clairvue en .exe sur une machine Windows, publie l'artifact
+# téléchargeable, et (sur un tag v* ou un lancement manuel avec un tag) crée
+# une Release GitHub avec l'exe joint — lien de téléchargement permanent.
 
 on:
   push:
@@ -19,14 +15,14 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Tag de la release à créer (ex. v1.0). Laisser vide = pas de release, seulement l'artifact."
+        description: "Tag de la release à créer (ex. v1.1). Vide = seulement l'artifact."
         required: false
         default: ""
   release:
     types: [created]
 
 permissions:
-  contents: write  # nécessaire pour créer le tag / la Release / téléverser l'exe
+  contents: write
 
 jobs:
   build:
@@ -46,20 +42,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
+      - name: Générer l'icône
+        shell: bash
+        run: python assets/make_icon.py || true
+
       - name: Compiler l'exécutable
-        run: >
-          pyinstaller --noconfirm --onefile --windowed
-          --name AssistantCaptureClaude
-          --collect-all anthropic
-          --collect-all pydantic
-          --hidden-import PIL._tkinter_finder
-          app.py
+        shell: bash
+        run: |
+          ICON_ARGS=""
+          if [ -f assets/clairvue.ico ]; then
+            ICON_ARGS="--icon assets/clairvue.ico --add-data assets/clairvue.ico;."
+          fi
+          pyinstaller --noconfirm --onefile --windowed \
+            --name Clairvue $ICON_ARGS \
+            --collect-all anthropic \
+            --collect-all pydantic \
+            --hidden-import PIL._tkinter_finder \
+            app.py
 
       - name: Publier l'artifact (.exe)
         uses: actions/upload-artifact@v4
         with:
-          name: AssistantCaptureClaude-windows
-          path: dist/AssistantCaptureClaude.exe
+          name: Clairvue-windows
+          path: dist/Clairvue.exe
           if-no-files-found: error
 
       - name: Déterminer le tag de release
@@ -78,15 +83,19 @@ jobs:
         if: steps.rel.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          name: "Assistant Capture → Claude ${{ steps.rel.outputs.tag }}"
+          name: "Clairvue ${{ steps.rel.outputs.tag }}"
           tag_name: ${{ steps.rel.outputs.tag }}
           target_commitish: ${{ github.sha }}
           body: |
-            Exécutable Windows autonome de l'assistant capture d'écran → Claude.
+            **Clairvue — Assistant d'écran intelligent** (exécutable Windows autonome).
 
-            Téléchargez **AssistantCaptureClaude.exe** ci-dessous, lancez-le,
-            puis renseignez votre clé API Anthropic dans la fenêtre.
+            Téléchargez **Clairvue.exe** ci-dessous, lancez-le, puis renseignez
+            votre clé API Anthropic dans la fenêtre.
 
-            Application normale et visible : aucun mécanisme de dissimulation
-            ni de contournement de détection (Alt+Tab, touche Windows, partage d'écran).
-          files: dist/AssistantCaptureClaude.exe
+            Fonctionnalités : capture région/plein écran, modes (OCR, traduire,
+            résumer, expliquer l'erreur/le code, pas à pas…), macros, historique,
+            export Markdown, thème clair/sombre, raccourcis globaux.
+
+            Application normale et visible : aucun mécanisme de dissimulation ni
+            de contournement de détection (Alt+Tab, touche Windows, partage d'écran).
+          files: dist/Clairvue.exe
