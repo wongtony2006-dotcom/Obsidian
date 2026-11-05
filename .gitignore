@@ -9,6 +9,14 @@ __pycache__/
 venv/
 env/
 
+# Build PyInstaller (.exe)
+build/
+dist/
+*.spec
+
+# Historique local éventuel
+history.json
+
 # OS / éditeurs
 .DS_Store
 Thumbs.db

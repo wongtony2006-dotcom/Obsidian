@@ -1,0 +1,59 @@
+name: Build Windows EXE
+
+# Compile l'application en .exe sur une machine Windows, puis publie le
+# fichier en « artifact » téléchargeable (et sur la Release pour un tag).
+
+on:
+  push:
+    branches:
+      - "claude/keen-volta-iw62s7"
+      - "main"
+      - "master"
+    paths:
+      - "app.py"
+      - "requirements.txt"
+      - "build_exe.bat"
+      - ".github/workflows/build-windows.yml"
+  workflow_dispatch: {}
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Compiler l'exécutable
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name AssistantCaptureClaude
+          --collect-all anthropic
+          --collect-all pydantic
+          --hidden-import PIL._tkinter_finder
+          app.py
+
+      - name: Publier l'artifact (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssistantCaptureClaude-windows
+          path: dist/AssistantCaptureClaude.exe
+          if-no-files-found: error
+
+      - name: Joindre l'exe à la Release (si déclenché par un tag)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AssistantCaptureClaude.exe
