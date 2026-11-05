@@ -1,7 +1,8 @@
 name: Build Windows EXE
 
 # Compile l'application en .exe sur une machine Windows, puis publie le
-# fichier en « artifact » téléchargeable (et sur la Release pour un tag).
+# fichier en « artifact » téléchargeable. Sur un tag « v* », crée en plus une
+# Release GitHub et y attache l'exécutable (lien de téléchargement permanent).
 
 on:
   push:
@@ -9,14 +10,14 @@ on:
       - "claude/keen-volta-iw62s7"
       - "main"
       - "master"
-    paths:
-      - "app.py"
-      - "requirements.txt"
-      - "build_exe.bat"
-      - ".github/workflows/build-windows.yml"
+    tags:
+      - "v*"
   workflow_dispatch: {}
   release:
     types: [created]
+
+permissions:
+  contents: write  # nécessaire pour créer la Release / téléverser l'exe
 
 jobs:
   build:
@@ -52,8 +53,18 @@ jobs:
           path: dist/AssistantCaptureClaude.exe
           if-no-files-found: error
 
-      - name: Joindre l'exe à la Release (si déclenché par un tag)
-        if: github.event_name == 'release'
+      - name: Créer la Release et joindre l'exe (sur un tag v*)
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
+          name: "Assistant Capture → Claude ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            Exécutable Windows autonome de l'assistant capture d'écran → Claude.
+
+            Téléchargez **AssistantCaptureClaude.exe** ci-dessous, lancez-le,
+            puis renseignez votre clé API Anthropic dans la fenêtre.
+
+            Application normale et visible : aucun mécanisme de dissimulation
+            ni de contournement de détection.
           files: dist/AssistantCaptureClaude.exe
