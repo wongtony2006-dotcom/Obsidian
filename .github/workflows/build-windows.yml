@@ -1,8 +1,12 @@
 name: Build Windows EXE
 
 # Compile l'application en .exe sur une machine Windows, puis publie le
-# fichier en « artifact » téléchargeable. Sur un tag « v* », crée en plus une
-# Release GitHub et y attache l'exécutable (lien de téléchargement permanent).
+# fichier en « artifact » téléchargeable.
+# Pour obtenir un lien de téléchargement PERMANENT, une Release GitHub est
+# créée (avec l'exe joint) dans deux cas :
+#   - push d'un tag « v* » ;
+#   - lancement manuel (workflow_dispatch) en indiquant un tag de release.
+# Dans ce dernier cas, c'est le runner GitHub qui crée le tag et la Release.
 
 on:
   push:
@@ -12,12 +16,17 @@ on:
       - "master"
     tags:
       - "v*"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag de la release à créer (ex. v1.0). Laisser vide = pas de release, seulement l'artifact."
+        required: false
+        default: ""
   release:
     types: [created]
 
 permissions:
-  contents: write  # nécessaire pour créer la Release / téléverser l'exe
+  contents: write  # nécessaire pour créer le tag / la Release / téléverser l'exe
 
 jobs:
   build:
@@ -53,12 +62,25 @@ jobs:
           path: dist/AssistantCaptureClaude.exe
           if-no-files-found: error
 
-      - name: Créer la Release et joindre l'exe (sur un tag v*)
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+      - name: Déterminer le tag de release
+        id: rel
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Créer la Release et joindre l'exe
+        if: steps.rel.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          name: "Assistant Capture → Claude ${{ github.ref_name }}"
-          tag_name: ${{ github.ref_name }}
+          name: "Assistant Capture → Claude ${{ steps.rel.outputs.tag }}"
+          tag_name: ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           body: |
             Exécutable Windows autonome de l'assistant capture d'écran → Claude.
 
@@ -66,5 +88,5 @@ jobs:
             puis renseignez votre clé API Anthropic dans la fenêtre.
 
             Application normale et visible : aucun mécanisme de dissimulation
-            ni de contournement de détection.
+            ni de contournement de détection (Alt+Tab, touche Windows, partage d'écran).
           files: dist/AssistantCaptureClaude.exe
